@@ -1,4 +1,3 @@
-# pages_custom/page_churn.py
 import streamlit as st
 import pandas as pd
 import altair as alt
