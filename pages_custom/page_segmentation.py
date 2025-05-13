@@ -3,14 +3,13 @@ import pandas as pd
 import altair as alt
 from pandas.errors import EmptyDataError, ParserError
 from src.model_segmentation import (
-    train_kmeans, train_hierarchical, train_gmm, train_nn_segmentation,
+    train_kmeans, train_gmm, train_nn_segmentation,
     enrich_segmentation
 )
 
 # Методы сегментации
 METHODS = {
     'KMeans': ('kmeans', train_kmeans),
-    'Hierarchical': ('hier', train_hierarchical),
     'Gaussian Mixture': ('gmm', train_gmm),
     'Neural Network': ('nn', train_nn_segmentation)
 }
@@ -35,12 +34,22 @@ def app():
     # Параметр числа сегментов
     n_clusters = st.slider('Количество сегментов', 2, 10, 4)
 
+    st.markdown('#### Выберите признаки для сегментации')
+    selected_features = st.multiselect(
+        'Выберите колонки для кластеризации',
+        ['CustAccountBalance', 'TransactionAmount', 'Age', 'CustGender', 'CustLocation'],
+        default=['CustAccountBalance', 'TransactionAmount', 'Age']
+    )
+    if not selected_features:
+        st.error('Нужно выбрать хотя бы один признак для сегментации')
+        return
+
     # Кнопка обучения с индикатором
     if st.button(f'Обучить модель ({method_name}) на встроенных данных'):
         try:
             df_raw = pd.read_csv('data/raw/transactions.csv')
             with st.spinner(f'Обучаем модель {method_name} с {n_clusters} сегментами...'):
-                train_fn(df_raw, n_clusters=n_clusters, save=True)
+                train_fn(df_raw, n_clusters=n_clusters, features=selected_features, save=True)
             st.success(f'Модель сегментации {method_name} обучена с {n_clusters} сегментами.')
         except Exception as e:
             st.error(f'Ошибка при обучении: {e}')
@@ -79,11 +88,36 @@ def app():
         st.error(f'Ошибка при обогащении данными: {e}')
         return
 
-    st.write('Пример сегментированных данных:', df_enriched.head())
-    chart = alt.Chart(df_enriched).mark_bar().encode(
-        x='Segment:O', y='count()', color='Segment:O'
-    ).properties(width=600, height=300)
-    st.altair_chart(chart)
+    st.write("Пример:", df_enriched.head())
 
-    csv = df_enriched.to_csv(index=False).encode('utf-8')
-    st.download_button('Скачать сегментированные данные', data=csv, file_name=f'segmented_{method_key}.csv')
+    # 1) Круговая диаграмма
+    pie = alt.Chart(df_enriched).mark_arc(innerRadius=50).encode(
+        theta=alt.Theta("count()", title="Клиенты"),
+        color=alt.Color("SegmentName:N", title="Сегмент"),
+        tooltip=["SegmentName", "count()"]
+    ).properties(width=300, height=300)
+    st.altair_chart(pie)
+
+    # 2) Точечный график (Age vs TransactionAmount)
+    scatter = alt.Chart(df_enriched.sample(min(1000, len(df_enriched)))).mark_circle(size=60, opacity=0.6).encode(
+        x="Age:Q", y="TransactionAmount:Q", color="SegmentName:N",
+        tooltip=["SegmentName", "Age", "TransactionAmount"]
+    ).properties(width=600, height=300)
+    st.altair_chart(scatter)
+
+    # 3) Гистограмма баланса
+    hist = alt.Chart(df_enriched).mark_bar().encode(
+        x=alt.X("CustAccountBalance:Q", bin=alt.Bin(maxbins=30)), y="count()",
+        color="SegmentName:N"
+    ).properties(width=600, height=300)
+    st.altair_chart(hist)
+
+    # 4) Столбчатая диаграмма числа клиентов
+    bar = alt.Chart(df_enriched).mark_bar().encode(
+        x=alt.X("SegmentName:N", sort=None), y="count()", color="SegmentName:N"
+    ).properties(width=600, height=300)
+    st.altair_chart(bar)
+
+    # Скачать CSV
+    csv = df_enriched.to_csv(index=False).encode("utf-8")
+    st.download_button("Скачать результат", csv, f"segmented_{method_key}.csv")
