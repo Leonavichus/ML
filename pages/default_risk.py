@@ -74,33 +74,38 @@ def create_visualizations(df: pd.DataFrame, pred_col: str, prob_col: str) -> Lis
         }
     )
 
-    # Улучшенная гистограмма вероятностей дефолта
-    hist = alt.Chart(df).mark_bar().encode(
-        x=alt.X(
-            f"{prob_col}:Q",
-            bin=alt.Bin(maxbins=30),
-            title="Вероятность дефолта"
-        ),
-        y=alt.Y(
-            "count()",
-            title="Количество заявок",
-            stack=None
-        ),
+    # Новая визуализация: Анализ риска по рейтингу и сумме кредита
+    df['loan_amount_category'] = pd.qcut(
+        df['loan_amnt'],
+        q=5,
+        labels=['Очень малый', 'Малый', 'Средний', 'Большой', 'Очень большой']
+    )
+    
+    risk_by_grade_amount = alt.Chart(df).mark_rect().encode(
+        x=alt.X('loan_amount_category:N', 
+                title='Категория суммы кредита',
+                sort=['Очень малый', 'Малый', 'Средний', 'Большой', 'Очень большой']),
+        y=alt.Y('loan_grade:N', 
+                title='Кредитный рейтинг',
+                sort=['A', 'B', 'C', 'D', 'E', 'F', 'G']),
         color=alt.Color(
-            f"{pred_col}:N",
-            scale=alt.Scale(domain=[0, 1], range=["#4caf50", "#e91e63"]),
-            legend=alt.Legend(title="Статус дефолта")
+            f'mean({prob_col}):Q',
+            title='Средняя вероятность дефолта',
+            scale=alt.Scale(scheme='redyellowgreen', reverse=True)
         ),
-        opacity=alt.value(0.7),
         tooltip=[
-            alt.Tooltip(f"{prob_col}:Q", title="Вероятность", format=".2f"),
-            alt.Tooltip("count()", title="Количество")
+            alt.Tooltip('loan_amount_category:N', title='Сумма кредита'),
+            alt.Tooltip('loan_grade:N', title='Рейтинг'),
+            alt.Tooltip(f'mean({prob_col}):Q', title='Ср. вероятность', format='.2%'),
+            alt.Tooltip('count()', title='Количество заявок'),
+            alt.Tooltip('mean(loan_amnt):Q', title='Ср. сумма', format=',.0f'),
+            alt.Tooltip('mean(loan_int_rate):Q', title='Ср. ставка', format='.1f')
         ]
     ).properties(
         width=600,
         height=300,
         title={
-            "text": "Распределение вероятностей дефолта",
+            "text": "Риск дефолта по рейтингу и размеру кредита",
             "fontSize": 16
         }
     )
@@ -190,7 +195,7 @@ def create_visualizations(df: pd.DataFrame, pred_col: str, prob_col: str) -> Lis
         }
     )
 
-    return [pie, hist, scatter, age_grade_risk, intent_analysis]
+    return [pie, risk_by_grade_amount, scatter, age_grade_risk, intent_analysis]
 
 
 def read_user_data(uploaded_file: Any) -> pd.DataFrame:

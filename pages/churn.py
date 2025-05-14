@@ -150,28 +150,27 @@ def create_visualization(df: pd.DataFrame, pred_col: str, prob_col: str) -> List
             title='Распределение вероятностей оттока по регионам'
         ),
         # Нижний график: Статистика по регионам
-        alt.Chart(df).transform_aggregate(
-            total='count()',
-            churned=f'sum(({pred_col} == 1)*1)',
-            avg_prob=f'mean({prob_col})',
-            avg_balance='mean(Balance)',
-            groupby=['Geography']
-        ).transform_calculate(
-            churn_rate='datum.churned / datum.total'
-        ).mark_bar().encode(
+        alt.Chart(df).mark_bar().encode(
             x=alt.X('Geography:N', title='Регион'),
-            y=alt.Y('total:Q', title='Количество клиентов'),
-            color=alt.Color('churn_rate:Q', 
-                          title='Доля оттока',
-                          scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
+            y=alt.Y('count():Q', title='Количество клиентов'),
+            color=alt.Color(
+                'mean_prob:Q',
+                title='Средняя вероятность оттока',
+                scale=alt.Scale(scheme='redyellowgreen', reverse=True)
+            ),
             tooltip=[
                 alt.Tooltip('Geography:N', title='Регион'),
-                alt.Tooltip('total:Q', title='Всего клиентов'),
-                alt.Tooltip('churned:Q', title='Ушедшие клиенты'),
-                alt.Tooltip('churn_rate:Q', title='Доля оттока', format='.2%'),
-                alt.Tooltip('avg_prob:Q', title='Ср. вероятность', format='.2%'),
-                alt.Tooltip('avg_balance:Q', title='Ср. баланс', format=',.2f')
+                alt.Tooltip('count():Q', title='Всего клиентов'),
+                alt.Tooltip('sum_pred:Q', title='Прогноз оттока'),
+                alt.Tooltip('mean_prob:Q', title='Ср. вероятность', format='.2%'),
+                alt.Tooltip('mean_balance:Q', title='Ср. баланс', format=',.2f')
             ]
+        ).transform_aggregate(
+            count='count()',
+            sum_pred=f'sum({pred_col})',
+            mean_prob=f'mean({prob_col})',
+            mean_balance='mean(Balance)',
+            groupby=['Geography']
         ).properties(
             width=600,
             height=200,
