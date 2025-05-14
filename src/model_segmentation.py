@@ -148,7 +148,7 @@ def train_gmm(df: pd.DataFrame, n_clusters: int = 4, features: list[str] = None,
     X = df2[features]
 
     pre = build_preprocessor(features)
-    X_proc = pre.fit_transform(X).toarray()  # гарантированно dense
+    X_proc = pre.fit_transform(X)
 
     gmm = GaussianMixture(n_components=n_clusters, random_state=42)
     gmm.fit(X_proc)
