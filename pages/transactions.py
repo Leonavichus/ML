@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-from typing import Dict, Callable, List, Tuple
+from typing import Dict, Callable, List
 from pandas.errors import EmptyDataError, ParserError
 from streamlit.runtime.uploaded_file_manager import UploadedFile
 from src.model_transactions import (
@@ -356,6 +356,9 @@ def app():
 
                 # Создание и отображение визуализаций
                 st.markdown("### 5. Визуализация результатов")
+
+                # Создание всех графиков
+                charts = create_visualizations(df_enriched)
                 
                 # Организуем графики в колонки для лучшего отображения
                 col1, col2 = st.columns([1, 2])

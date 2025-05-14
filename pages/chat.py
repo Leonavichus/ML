@@ -1,7 +1,7 @@
 import ollama
 import streamlit as st
 import torch
-from typing import Generator, List, Dict, Optional, Union
+from typing import Generator, List, Dict
 from logging import getLogger
 import time
 
@@ -46,7 +46,6 @@ def generate_response(model: str, messages: List[Dict[str, str]]) -> Generator[s
     Возвращает:
         str: Части ответа от модели
     """
-    device = "cuda" if torch.cuda.is_available() else "cpu"
     try:
         for chunk in ollama.chat(
                 model=model,
