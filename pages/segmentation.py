@@ -392,9 +392,45 @@ def app():
 
                 # Создание и отображение визуализаций
                 st.markdown("### 7. Визуализация результатов")
-                charts = create_visualizations(df_enriched)
-                for chart in charts:
-                    st.altair_chart(chart)
+                
+                # Организуем графики в колонки для лучшего отображения
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    # Круговая диаграмма
+                    st.markdown("#### Распределение сегментов")
+                    st.altair_chart(create_visualizations(df_enriched)[0], use_container_width=True)
+                
+                with col2:
+                    # Точечная диаграмма
+                    st.markdown("#### Возраст и транзакции")
+                    st.altair_chart(create_visualizations(df_enriched)[1], use_container_width=True)
+                
+                st.markdown("---")  # Разделитель для лучшей читаемости
+                
+                # Гистограмма на всю ширину
+                st.markdown("#### Распределение баланса")
+                st.altair_chart(create_visualizations(df_enriched)[2], use_container_width=True)
+                
+                st.markdown("---")  # Разделитель для лучшей читаемости
+                
+                col3, col4 = st.columns(2)
+                
+                with col3:
+                    # Тепловая карта
+                    st.markdown("#### Региональный анализ")
+                    st.altair_chart(create_visualizations(df_enriched)[3], use_container_width=True)
+                
+                with col4:
+                    # Гендерное распределение
+                    st.markdown("#### Гендерный анализ")
+                    st.altair_chart(create_visualizations(df_enriched)[4], use_container_width=True)
+                
+                st.markdown("---")  # Разделитель для лучшей читаемости
+                
+                # Боксплот на всю ширину
+                st.markdown("#### Возрастные характеристики")
+                st.altair_chart(create_visualizations(df_enriched)[5], use_container_width=True)
 
                 # Скачивание результатов
                 st.markdown("### 8. Выгрузка результатов")

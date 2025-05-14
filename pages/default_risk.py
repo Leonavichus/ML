@@ -364,13 +364,38 @@ def app():
 
                 # Создание и отображение визуализаций
                 st.markdown("### 5. Визуализация результатов")
-                charts = create_visualizations(
-                    df_enriched,
-                    pred_col="Default_Pred",
-                    prob_col="Default_Prob"
-                )
-                for chart in charts:
-                    st.altair_chart(chart)
+                
+                # Организуем графики в колонки для лучшего отображения
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    # Круговая диаграмма
+                    st.markdown("#### Распределение прогнозов")
+                    st.altair_chart(create_visualizations(df_enriched, "Default_Pred", "Default_Prob")[0], use_container_width=True)
+                
+                with col2:
+                    # Тепловая карта риска по рейтингу и размеру кредита
+                    st.markdown("#### Анализ риска")
+                    st.altair_chart(create_visualizations(df_enriched, "Default_Pred", "Default_Prob")[1], use_container_width=True)
+                
+                st.markdown("---")  # Разделитель для лучшей читаемости
+                
+                # Точечная диаграмма на всю ширину
+                st.markdown("#### Соотношение дохода и суммы кредита")
+                st.altair_chart(create_visualizations(df_enriched, "Default_Pred", "Default_Prob")[2], use_container_width=True)
+                
+                st.markdown("---")  # Разделитель для лучшей читаемости
+                
+                # Нижние графики также в колонках
+                col3, col4 = st.columns(2)
+                
+                with col3:
+                    st.markdown("#### Риск по возрасту и рейтингу")
+                    st.altair_chart(create_visualizations(df_enriched, "Default_Pred", "Default_Prob")[3], use_container_width=True)
+                
+                with col4:
+                    st.markdown("#### Анализ целей кредита")
+                    st.altair_chart(create_visualizations(df_enriched, "Default_Pred", "Default_Prob")[4], use_container_width=True)
 
                 # Скачивание результатов
                 st.markdown("### 6. Выгрузка результатов")

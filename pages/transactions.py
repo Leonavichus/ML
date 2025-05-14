@@ -356,9 +356,45 @@ def app():
 
                 # Создание и отображение визуализаций
                 st.markdown("### 5. Визуализация результатов")
-                charts = create_visualizations(df_enriched)
-                for chart in charts:
-                    st.altair_chart(chart)
+                
+                # Организуем графики в колонки для лучшего отображения
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    # Круговая диаграмма
+                    st.markdown("#### Распределение транзакций")
+                    st.altair_chart(charts[1], use_container_width=True)
+                
+                with col2:
+                    # Гистограмма распределения скоринга
+                    st.markdown("#### Распределение оценок")
+                    st.altair_chart(charts[0], use_container_width=True)
+                
+                st.markdown("---")  # Разделитель для лучшей читаемости
+                
+                col3, col4 = st.columns(2)
+                
+                with col3:
+                    # График по часам
+                    st.markdown("#### Анализ по времени")
+                    st.altair_chart(charts[2], use_container_width=True)
+                
+                with col4:
+                    # Тепловая карта
+                    st.markdown("#### Тепловая карта аномалий")
+                    st.altair_chart(charts[3], use_container_width=True)
+                
+                st.markdown("---")  # Разделитель для лучшей читаемости
+                
+                # Точечная диаграмма на всю ширину
+                st.markdown("#### Анализ сумм транзакций")
+                st.altair_chart(charts[4], use_container_width=True)
+                
+                st.markdown("---")  # Разделитель для лучшей читаемости
+                
+                # Распределение сумм по типам транзакций
+                st.markdown("#### Распределение по типам")
+                st.altair_chart(charts[5], use_container_width=True)
 
                 # Скачивание результатов
                 st.markdown("### 6. Выгрузка результатов")

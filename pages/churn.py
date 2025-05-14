@@ -408,13 +408,37 @@ def app():
 
                 # Создание и отображение визуализаций
                 st.markdown("### 5. Визуализация результатов")
-                charts = create_visualization(
-                    df_enriched,
-                    pred_col="Exited_Pred",
-                    prob_col="Exited_Prob"
-                )
-                for chart in charts:
-                    st.altair_chart(chart)
+                
+                # Организуем графики в колонки для лучшего отображения
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    # Круговая диаграмма
+                    st.markdown("#### Распределение прогнозов")
+                    st.altair_chart(create_visualization(df_enriched, "Exited_Pred", "Exited_Prob")[0], use_container_width=True)
+                
+                with col2:
+                    # Гистограмма вероятностей
+                    st.markdown("#### Распределение вероятностей")
+                    st.altair_chart(create_visualization(df_enriched, "Exited_Pred", "Exited_Prob")[1], use_container_width=True)
+                
+                st.markdown("---")  # Разделитель для лучшей читаемости
+                
+                # Точечная диаграмма на всю ширину
+                st.markdown("#### Анализ по возрасту и балансу")
+                st.altair_chart(create_visualization(df_enriched, "Exited_Pred", "Exited_Prob")[2], use_container_width=True)
+                
+                st.markdown("---")  # Разделитель для лучшей читаемости
+                
+                # Анализ по регионам
+                st.markdown("#### Региональный анализ")
+                st.altair_chart(create_visualization(df_enriched, "Exited_Pred", "Exited_Prob")[3], use_container_width=True)
+                
+                st.markdown("---")  # Разделитель для лучшей читаемости
+                
+                # Анализ продуктовой корзины
+                st.markdown("#### Анализ продуктов")
+                st.altair_chart(create_visualization(df_enriched, "Exited_Pred", "Exited_Prob")[4], use_container_width=True)
 
                 # Скачивание результатов
                 st.markdown("### 6. Выгрузка результатов")
