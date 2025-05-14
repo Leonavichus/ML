@@ -1,11 +1,23 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
-from pages_custom import page_chat, page_churn, page_segmentation, page_transactions, page_default_risk
+from typing import Dict, List, Callable, Optional
+from pages_custom import (
+    page_chat,
+    page_churn,
+    page_segmentation,
+    page_transactions,
+    page_default_risk
+)
 
-st.set_page_config(page_title="Analytics App", page_icon="📊", layout="wide")
+# Конфигурация страницы Streamlit
+st.set_page_config(
+    page_title="Analytics App",
+    page_icon="📊",
+    layout="wide"
+)
 
-# Собираем пункты меню с иконками
-menu_items = [
+# Конфигурация пунктов меню
+menu_items: List[Dict[str, str]] = [
     {"name": "Чат", "icon": "chat-dots"},
     {"name": "Отток клиентов", "icon": "graph-down"},
     {"name": "Сегментация клиентов", "icon": "people-fill"},
@@ -13,6 +25,7 @@ menu_items = [
     {"name": "Риск дефолта", "icon": "exclamation-triangle-fill"},
 ]
 
+# Боковая панель навигации
 with st.sidebar:
     st.sidebar.header("Analytics App")
     choice = option_menu(
@@ -30,14 +43,12 @@ with st.sidebar:
                 "margin": "0px",
                 "background-color": "transparent",
             },
-            "nav-link-selected": {
-                "background-color": "indigo",
-            },
+            "nav-link-selected": {"background-color": "indigo"},
         },
     )
 
-# Mapping
-PAGES = {
+# Конфигурация маршрутизации страниц
+PAGES: Dict[str, Callable] = {
     "Чат": page_chat,
     "Отток клиентов": page_churn,
     "Сегментация клиентов": page_segmentation,
@@ -45,4 +56,5 @@ PAGES = {
     "Риск дефолта": page_default_risk,
 }
 
+# Отображение выбранной страницы
 PAGES[choice].app()

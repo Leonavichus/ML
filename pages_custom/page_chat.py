@@ -1,69 +1,98 @@
 import ollama
 import streamlit as st
 import torch
+from typing import Generator, List, Dict, Optional, Union
+from logging import getLogger
 
-def app():
-    st.title("Чат с моделью Ollama")
+logger = getLogger(__name__)
 
-    # Инициализируем историю сообщений в сессии
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    # Получаем список моделей от Ollama
+def get_available_models() -> List[str]:
+    """
+    Получение списка доступных моделей из сервиса Ollama.
+    
+    Возвращает:
+        List[str]: Список имен доступных моделей
+        
+    Вызывает:
+        Exception: Если не удалось получить список моделей из Ollama
+    """
     try:
         response = ollama.list()
-        # Правильная обработка результата ollama.list()
         models = [model.model for model in response.models]
-
         if not models:
-            st.warning("Список моделей пуст. Проверьте, что Ollama запущена и есть загруженные модели.")
-            return
+            raise ValueError("Не найдены модели в сервисе Ollama")
+        return models
     except Exception as e:
-        st.error(f"Не удалось получить список моделей: {e}")
-        return
+        logger.error(f"Не удалось получить список моделей: {str(e)}")
+        raise
 
-    # Выбор модели из списка
-    if "model" not in st.session_state or st.session_state.model not in models:
-        st.session_state.model = models[0]
-    st.session_state.model = st.selectbox(
-        "Выберите модель для чата",
-        models,
-        index=models.index(st.session_state.model)
-    )
-
-    # Генератор потокового ответа от Ollama
-    def generate_response():
-        # Определяем устройство (CPU или GPU)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        # Запускаем chat с параметром stream=True
+def generate_response(model: str, messages: List[Dict[str, str]]) -> Generator[str, None, None]:
+    """
+    Генерация потокового ответа от выбранной модели.
+    
+    Аргументы:
+        model (str): Имя модели Ollama для использования
+        messages (List[Dict[str, str]]): История чата
+        
+    Возвращает:
+        str: Части ответа от модели
+    """
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    try:
         for chunk in ollama.chat(
-            model=st.session_state.model,
-            messages=st.session_state.messages,
+            model=model,
+            messages=messages,
             stream=True
         ):
             yield chunk["message"]["content"]
+    except Exception as e:
+        logger.error(f"Ошибка при генерации ответа: {str(e)}")
+        yield f"Ошибка: Не удалось сгенерировать ответ. Пожалуйста, попробуйте снова."
 
-    # Выводим историю диалога
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+def app():
+    """Основной интерфейс приложения чата."""
+    st.title("Чат с моделью Ollama")
 
-    # Ввод нового сообщения
-    user_input = st.chat_input("Введите сообщение...")
-    if user_input:
-        # Добавляем сообщение пользователя в историю
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        with st.chat_message("user"):
-            st.markdown(user_input)
+    # Инициализация состояния сессии
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-        # Ответ ассистента
-        with st.chat_message("assistant"):
-            full_response = ""
-            # создаём один placeholder для всего текста
-            placeholder = st.empty()
-            for part in generate_response():
-                full_response += part
-                # обновляем содержимое placeholder'а полностью
-                placeholder.markdown(full_response)
-            # сохраняем полный ответ в историю
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
+    try:
+        # Получение и отображение выбора модели
+        models = get_available_models()
+        if "model" not in st.session_state or st.session_state.model not in models:
+            st.session_state.model = models[0]
+        
+        st.session_state.model = st.selectbox(
+            "Выберите модель для чата",
+            models,
+            index=models.index(st.session_state.model)
+        )
+
+        # Отображение истории чата
+        for msg in st.session_state.messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        # Обработка пользовательского ввода
+        user_input = st.chat_input("Введите сообщение...")
+        if user_input:
+            # Добавление сообщения пользователя в историю
+            st.session_state.messages.append({"role": "user", "content": user_input})
+            with st.chat_message("user"):
+                st.markdown(user_input)
+
+            # Генерация и отображение ответа ассистента
+            with st.chat_message("assistant"):
+                full_response = ""
+                message_placeholder = st.empty()
+                
+                for response_chunk in generate_response(st.session_state.model, st.session_state.messages):
+                    full_response += response_chunk
+                    message_placeholder.markdown(full_response)
+                
+                st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+    except Exception as e:
+        st.error(f"Произошла ошибка: {str(e)}")
+        logger.exception("Ошибка в приложении чата")
