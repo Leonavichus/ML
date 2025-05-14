@@ -1,13 +1,12 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
-import numpy as np
 from typing import Dict, List, Tuple, Callable, Any
 from pandas.errors import EmptyDataError, ParserError
 from sklearn.exceptions import NotFittedError
 from src.model_default_risk import (
-    train_default_model, load_default_model, enrich_default,
-    train_default_nn_model, load_default_nn_model, enrich_default_nn
+    train_default_model, load_model, enrich_predictions,
+    train_default_nn_model
 )
 from logging import getLogger
 
@@ -21,8 +20,8 @@ st.set_page_config(
 
 # Словарь доступных моделей для оценки риска дефолта с их описаниями
 MODEL_OPTIONS: Dict[str, Tuple[str, Callable, Callable, Callable]] = {
-    'Logistic Regression': ('logreg', train_default_model, load_default_model, enrich_default),
-    'Neural Network': ('nn', train_default_nn_model, load_default_nn_model, enrich_default_nn)
+    'Logistic Regression': ('logreg', train_default_model, lambda: load_model('logreg'), lambda df, model: enrich_predictions(df, model, 'logreg')),
+    'Neural Network': ('nn', train_default_nn_model, lambda: load_model('nn'), lambda df, model: enrich_predictions(df, model, 'nn'))
 }
 
 # Обязательные поля для анализа риска дефолта с подробными описаниями

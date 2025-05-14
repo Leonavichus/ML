@@ -1,3 +1,11 @@
+"""
+Модуль для обнаружения аномальных транзакций с использованием различных методов машинного обучения.
+Включает три основных алгоритма:
+- Isolation Forest (изоляционный лес)
+- One-Class SVM (одноклассовый метод опорных векторов)
+- Local Outlier Factor (локальный уровень выброса)
+"""
+
 import pandas as pd
 import joblib
 from sklearn.impute import SimpleImputer
@@ -7,36 +15,73 @@ from sklearn.pipeline import make_pipeline
 from sklearn.ensemble import IsolationForest
 from sklearn.svm import OneClassSVM
 from sklearn.neighbors import LocalOutlierFactor
+from typing import Tuple
+import logging
 
-# Пути для сохранения моделей
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Пути для сохранения обученных моделей
 IFOREST_PATH = "models/anomaly/isolation_forest.pkl"
 OCSVM_PATH   = "models/anomaly/ocsvm.pkl"
 LOF_PATH     = "models/anomaly/lof.pkl"
 
-# Наши поля
+# Определение признаков для обработки
 NUMERICAL   = ["amount", "hour_of_day", "session_duration", "login_frequency", "risk_score"]
 CATEGORICAL = ["transaction_type", "location_region", "ip_prefix", "purchase_pattern", "age_group"]
 
-def build_preprocessor():
-    """ColumnTransformer: числовые → StandardScaler, категориальные → OneHotEncoder."""
-    num_pipe = make_pipeline(SimpleImputer(strategy="median"), StandardScaler())
-    cat_pipe = make_pipeline(SimpleImputer(strategy="most_frequent"),
-                             OneHotEncoder(handle_unknown="ignore", sparse_output=False))
+def build_preprocessor() -> ColumnTransformer:
+    """
+    Создает пайплайн предобработки данных.
+    
+    Числовые признаки: заполнение медианой и стандартизация
+    Категориальные признаки: заполнение модой и one-hot кодирование
+    
+    Returns:
+        ColumnTransformer: сконфигурированный трансформер данных
+    """
+    num_pipe = make_pipeline(
+        SimpleImputer(strategy="median"),
+        StandardScaler()
+    )
+    
+    cat_pipe = make_pipeline(
+        SimpleImputer(strategy="most_frequent"),
+        OneHotEncoder(handle_unknown="ignore", sparse_output=False)
+    )
+    
     return ColumnTransformer([
         ("num", num_pipe, NUMERICAL),
         ("cat", cat_pipe, CATEGORICAL),
     ], remainder="drop")
 
-# Isolation Forest
-def train_iforest(df: pd.DataFrame, save: bool = True):
+def train_iforest(df: pd.DataFrame, save: bool = True) -> Tuple[ColumnTransformer, IsolationForest]:
+    """
+    Обучает модель Isolation Forest для поиска аномалий.
+    
+    Args:
+        df: DataFrame с данными для обучения
+        save: сохранить ли модель на диск
+    
+    Returns:
+        Tuple[preprocessor, model]: предобработчик и обученная модель
+    """
+    logger.info("Начало обучения Isolation Forest...")
     pre = build_preprocessor()
     X = df[NUMERICAL + CATEGORICAL]
     Xp = pre.fit_transform(X)
 
-    model = IsolationForest(n_estimators=100, contamination=0.01, random_state=42)
+    model = IsolationForest(
+        n_estimators=100,
+        contamination=0.01,
+        random_state=42,
+        n_jobs=-1  # Используем все доступные ядра
+    )
     model.fit(Xp)
 
     if save:
+        logger.info(f"Сохранение модели в {IFOREST_PATH}")
         joblib.dump((pre, model), IFOREST_PATH)
     return pre, model
 
@@ -80,28 +125,48 @@ def load_model(name: str):
         return joblib.load(LOF_PATH)
     raise ValueError(f"Неизвестный метод {name}")
 
-# Обогащение
 def enrich(df: pd.DataFrame, name: str) -> pd.DataFrame:
-    pre, model = load_model(name)
-    X = df[NUMERICAL + CATEGORICAL]
-    Xp = pre.transform(X)
+    """
+    Обогащает датафрейм результатами определения аномалий.
+    
+    Args:
+        df: исходный DataFrame
+        name: название метода ('Isolation Forest', 'One-Class SVM', 'Local Outlier Factor')
+    
+    Returns:
+        DataFrame с добавленными колонками:
+        - AnomalyScore: числовая оценка аномальности
+        - AnomalyPred: бинарная метка (1 - норма, -1 - аномалия)
+    
+    Raises:
+        ValueError: если указано неизвестное название метода
+    """
+    try:
+        pre, model = load_model(name)
+        X = df[NUMERICAL + CATEGORICAL]
+        Xp = pre.transform(X)
+        
+        df2 = df.copy()
+        
+        if name == "Isolation Forest":
+            scores = model.decision_function(Xp)
+            preds = model.predict(Xp)
+        elif name == "One-Class SVM":
+            scores = model.score_samples(Xp)
+            preds = model.predict(Xp)
+        else:  # Local Outlier Factor
+            lof = model
+            scores = lof.negative_outlier_factor_
+            preds = lof.fit_predict(Xp)
 
-    if name == "Isolation Forest":
-        scores = model.decision_function(Xp)
-        preds  = model.predict(Xp)
-    elif name == "One-Class SVM":
-        scores = model.score_samples(Xp)
-        preds  = model.predict(Xp)
-    else:  # Local Outlier Factor
-        # LOF: отрицательный outlier_factor_, все >1 considered normal
-        lof = model
-        # при загрузке LOF можно переиспользовать .negative_outlier_factor_
-        scores = lof.negative_outlier_factor_
-        # повторим fit_predict, чтобы получить метки
-        preds = lof.fit_predict(Xp)
-
-    # нормальные → 1, аномалии → -1
-    df2 = df.copy()
-    df2["AnomalyScore"] = scores
-    df2["AnomalyPred"]  = preds
-    return df2
+        df2["AnomalyScore"] = scores
+        df2["AnomalyPred"] = preds
+        
+        # Добавляем понятную метку аномалии
+        df2["IsAnomaly"] = df2["AnomalyPred"].map({1: "Норма", -1: "Аномалия"})
+        
+        return df2
+        
+    except Exception as e:
+        logger.error(f"Ошибка при обогащении данных: {str(e)}")
+        raise
