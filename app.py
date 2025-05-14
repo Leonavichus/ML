@@ -1,60 +1,48 @@
 import streamlit as st
-from streamlit_option_menu import option_menu
-from typing import Dict, List, Callable, Optional
-from pages_custom import (
-    page_chat,
-    page_churn,
-    page_segmentation,
-    page_transactions,
-    page_default_risk
-)
 
-# Конфигурация страницы Streamlit
+# Настройка темы и стиля
 st.set_page_config(
     page_title="Analytics App",
     page_icon="📊",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# Конфигурация пунктов меню
-menu_items: List[Dict[str, str]] = [
-    {"name": "Чат", "icon": "chat-dots"},
-    {"name": "Отток клиентов", "icon": "graph-down"},
-    {"name": "Сегментация клиентов", "icon": "people-fill"},
-    {"name": "Транзакции", "icon": "currency-exchange"},
-    {"name": "Риск дефолта", "icon": "exclamation-triangle-fill"},
-]
+# Применение пользовательских стилей CSS
+st.markdown("""
+<style>
+    .main {
+        padding: 1rem;
+    }
+    .stButton>button {
+        width: 100%;
+    }
+    .stSelectbox {
+        margin-bottom: 1rem;
+    }
+    .st-emotion-cache-1y4p8pa {
+        padding: 1rem;
+    }
+    .st-emotion-cache-1wrcr25 {
+        margin-bottom: 0.5rem;
+    }
+    /* Стиль для главной страницы в sidebar */
+    section[data-testid="stSidebar"] .element-container:first-child .stMarkdown {
+        font-weight: bold;
+    }
+</style>
+""", unsafe_allow_html=True)
 
-# Боковая панель навигации
-with st.sidebar:
-    st.sidebar.header("Analytics App")
-    choice = option_menu(
-        menu_title=None,
-        options=[item["name"] for item in menu_items],
-        icons=[item["icon"] for item in menu_items],
-        menu_icon="cast",
-        default_index=0,
-        orientation="vertical",
-        styles={
-            "container": {"padding": "0!important", "background-color": "transparent"},
-            "nav-link": {
-                "font-size": "16px",
-                "text-align": "left",
-                "margin": "0px",
-                "background-color": "transparent",
-            },
-            "nav-link-selected": {"background-color": "indigo"},
-        },
-    )
+# Главная страница
+st.title("📈 Analytics App")
+st.markdown("### Добро пожаловать в Analytics App!")
 
-# Конфигурация маршрутизации страниц
-PAGES: Dict[str, Callable] = {
-    "Чат": page_chat,
-    "Отток клиентов": page_churn,
-    "Сегментация клиентов": page_segmentation,
-    "Транзакции": page_transactions,
-    "Риск дефолта": page_default_risk,
-}
+st.markdown("""
+Выберите нужный раздел в меню слева:
 
-# Отображение выбранной страницы
-PAGES[choice].app()
+- 💬 **Чат** - Интерактивный чат с AI-моделью
+- 📉 **Отток клиентов** - Анализ и прогнозирование оттока
+- 👥 **Сегментация клиентов** - Кластеризация и анализ сегментов
+- 💱 **Транзакции** - Анализ финансовых операций
+- ⚠️ **Риск дефолта** - Оценка кредитных рисков
+""")
