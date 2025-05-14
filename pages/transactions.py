@@ -156,21 +156,42 @@ def create_visualizations(df: pd.DataFrame) -> List[alt.Chart]:
         title="Зависимость аномальности от суммы транзакции"
     )
 
-    # Добавляем боксплот для распределения сумм
-    boxplot = alt.Chart(df).mark_boxplot().encode(
-        x=alt.X("AnomalyPred:N", title="Тип транзакции"),
-        y=alt.Y("Amount:Q", title="Сумма"),
+    # Заменяем боксплот на более информативную визуализацию распределения сумм по типам транзакций
+    amount_distribution = alt.Chart(df).transform_density(
+        'amount',
+        as_=['amount', 'density'],
+        groupby=['transaction_type', 'AnomalyPred'],
+        steps=100
+    ).mark_area(
+        opacity=0.5
+    ).encode(
+        x=alt.X('amount:Q', title='Сумма транзакции'),
+        y=alt.Y('density:Q', title='Плотность распределения', stack=None),
         color=alt.Color(
-            "AnomalyPred:N",
-            scale=alt.Scale(domain=[1, -1], range=["#4caf50", "#e91e63"])
-        )
+            'AnomalyPred:N',
+            scale=alt.Scale(domain=[1, -1], range=['#4caf50', '#e91e63']),
+            title='Тип транзакции'
+        ),
+        row=alt.Row('transaction_type:N', title='Тип транзакции'),
+        tooltip=[
+            alt.Tooltip('amount:Q', title='Сумма', format=',.2f'),
+            alt.Tooltip('density:Q', title='Плотность'),
+            alt.Tooltip('transaction_type:N', title='Тип транзакции'),
+            alt.Tooltip('AnomalyPred:N', title='Статус аномалии')
+        ]
     ).properties(
-        width=300,
-        height=300,
-        title="Распределение сумм транзакций"
+        height=100,
+        title={
+            "text": "Распределение сумм по типам транзакций",
+            "fontSize": 16
+        }
+    ).configure_facet(
+        spacing=10
+    ).configure_view(
+        stroke=None
     )
 
-    return [hist, pie, line, heatmap, scatter, boxplot]
+    return [hist, pie, line, heatmap, scatter, amount_distribution]
 
 
 def read_user_data(uploaded_file: UploadedFile) -> pd.DataFrame:

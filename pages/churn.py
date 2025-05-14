@@ -122,54 +122,127 @@ def create_visualization(df: pd.DataFrame, pred_col: str, prob_col: str) -> List
         title="Отток в зависимости от возраста и баланса"
     )
 
-    # Тепловая карта оттока по регионам и возрастным группам
-    df["AgeGroup"] = pd.cut(
-        df["Age"],
-        bins=[0, 25, 35, 45, 55, 100],
-        labels=["18-25", "26-35", "36-45", "46-55", "55+"]
-    )
-
-    heatmap = alt.Chart(df).mark_rect().encode(
-        x=alt.X("AgeGroup:N", title="Возрастная группа"),
-        y=alt.Y("Geography:N", title="Регион"),
-        color=alt.Color(
-            "mean(" + prob_col + "):Q",
-            title="Вероятность оттока",
-            scale=alt.Scale(scheme="redyellowgreen", reverse=True)
+    # Комплексный анализ по регионам
+    region_analysis = alt.vconcat(
+        # Верхний график: Распределение вероятностей оттока по регионам
+        alt.Chart(df).transform_density(
+            f'{prob_col}',
+            as_=[f'{prob_col}', 'density'],
+            groupby=['Geography'],
+            steps=100
+        ).mark_area(
+            opacity=0.6,
+            interpolate='monotone'
+        ).encode(
+            x=alt.X(f'{prob_col}:Q', title='Вероятность оттока'),
+            y=alt.Y('density:Q', title='Плотность', stack=None),
+            color=alt.Color('Geography:N', 
+                          title='Регион',
+                          scale=alt.Scale(scheme='category10')),
+            tooltip=[
+                alt.Tooltip(f'{prob_col}:Q', title='Вероятность', format='.2%'),
+                alt.Tooltip('density:Q', title='Плотность'),
+                alt.Tooltip('Geography:N', title='Регион')
+            ]
+        ).properties(
+            width=600,
+            height=200,
+            title='Распределение вероятностей оттока по регионам'
         ),
-        tooltip=[
-            alt.Tooltip("AgeGroup:N", title="Возраст"),
-            alt.Tooltip("Geography:N", title="Регион"),
-            alt.Tooltip("mean(" + prob_col + "):Q", title="Ср. вероятность", format=".2%"),
-            alt.Tooltip("count()", title="Количество клиентов")
-        ]
+        # Нижний график: Статистика по регионам
+        alt.Chart(df).transform_aggregate(
+            total='count()',
+            churned=f'sum(({pred_col} == 1)*1)',
+            avg_prob=f'mean({prob_col})',
+            avg_balance='mean(Balance)',
+            groupby=['Geography']
+        ).transform_calculate(
+            churn_rate='datum.churned / datum.total'
+        ).mark_bar().encode(
+            x=alt.X('Geography:N', title='Регион'),
+            y=alt.Y('total:Q', title='Количество клиентов'),
+            color=alt.Color('churn_rate:Q', 
+                          title='Доля оттока',
+                          scale=alt.Scale(scheme='redyellowgreen', reverse=True)),
+            tooltip=[
+                alt.Tooltip('Geography:N', title='Регион'),
+                alt.Tooltip('total:Q', title='Всего клиентов'),
+                alt.Tooltip('churned:Q', title='Ушедшие клиенты'),
+                alt.Tooltip('churn_rate:Q', title='Доля оттока', format='.2%'),
+                alt.Tooltip('avg_prob:Q', title='Ср. вероятность', format='.2%'),
+                alt.Tooltip('avg_balance:Q', title='Ср. баланс', format=',.2f')
+            ]
+        ).properties(
+            width=600,
+            height=200,
+            title='Статистика оттока по регионам'
+        )
     ).properties(
-        width=500,
-        height=200,
-        title="Тепловая карта оттока по регионам и возрасту"
+        title={
+            "text": "Анализ оттока по регионам",
+            "fontSize": 16
+        }
     )
 
-    # Распределение оттока по числу продуктов
-    products = alt.Chart(df).mark_bar().encode(
-        x=alt.X("NumOfProducts:O", title="Количество продуктов"),
-        y=alt.Y("count()", title="Количество клиентов"),
-        color=alt.Color(
-            f"{pred_col}:N",
-            scale=alt.Scale(domain=[0, 1], range=["#4caf50", "#e91e63"]),
-            legend=alt.Legend(title="Прогноз оттока")
+    # Анализ продуктовой корзины
+    product_analysis = alt.vconcat(
+        # Верхний график: Распределение клиентов по количеству продуктов
+        alt.Chart(df).transform_aggregate(
+            count='count()',
+            churned=f'sum(({pred_col} == 1)*1)',
+            groupby=['NumOfProducts', 'IsActiveMember']
+        ).transform_calculate(
+            churn_rate='datum.churned / datum.count'
+        ).mark_bar().encode(
+            x=alt.X('NumOfProducts:O', title='Количество продуктов'),
+            y=alt.Y('count:Q', title='Количество клиентов'),
+            color=alt.Color('IsActiveMember:N',
+                          scale=alt.Scale(domain=[0, 1], range=['#ff9800', '#2196f3']),
+                          title='Активность'),
+            tooltip=[
+                alt.Tooltip('NumOfProducts:O', title='Продуктов'),
+                alt.Tooltip('count:Q', title='Клиентов'),
+                alt.Tooltip('churned:Q', title='Ушли'),
+                alt.Tooltip('churn_rate:Q', title='Доля оттока', format='.2%'),
+                alt.Tooltip('IsActiveMember:N', title='Активный клиент')
+            ]
+        ).properties(
+            width=600,
+            height=200,
+            title='Распределение клиентов по количеству продуктов'
         ),
-        tooltip=[
-            alt.Tooltip("NumOfProducts:O", title="Продуктов"),
-            alt.Tooltip("count()", title="Клиентов"),
-            alt.Tooltip(f"mean({prob_col}):Q", title="Ср. вероятность", format=".2%")
-        ]
+        # Нижний график: Средняя вероятность оттока
+        alt.Chart(df).transform_aggregate(
+            avg_prob=f'mean({prob_col})',
+            avg_balance='mean(Balance)',
+            avg_tenure='mean(Tenure)',
+            groupby=['NumOfProducts', 'IsActiveMember']
+        ).mark_line(point=True).encode(
+            x=alt.X('NumOfProducts:O', title='Количество продуктов'),
+            y=alt.Y('avg_prob:Q', title='Средняя вероятность оттока', scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color('IsActiveMember:N',
+                          scale=alt.Scale(domain=[0, 1], range=['#ff9800', '#2196f3']),
+                          title='Активность'),
+            tooltip=[
+                alt.Tooltip('NumOfProducts:O', title='Продуктов'),
+                alt.Tooltip('avg_prob:Q', title='Ср. вероятность', format='.2%'),
+                alt.Tooltip('avg_balance:Q', title='Ср. баланс', format=',.2f'),
+                alt.Tooltip('avg_tenure:Q', title='Ср. стаж', format='.1f'),
+                alt.Tooltip('IsActiveMember:N', title='Активный клиент')
+            ]
+        ).properties(
+            width=600,
+            height=200,
+            title='Зависимость вероятности оттока от количества продуктов'
+        )
     ).properties(
-        width=400,
-        height=300,
-        title="Отток по количеству продуктов"
+        title={
+            "text": "Анализ продуктовой корзины и активности",
+            "fontSize": 16
+        }
     )
 
-    return [pie, hist, scatter, heatmap, products]
+    return [pie, hist, scatter, region_analysis, product_analysis]
 
 
 def read_user_data(uploaded_file: Any) -> pd.DataFrame:

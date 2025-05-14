@@ -52,7 +52,7 @@ def create_visualizations(df: pd.DataFrame, pred_col: str, prob_col: str) -> Lis
     Возвращает:
         List[alt.Chart]: Список интерактивных графиков визуализации
     """
-    # Круговая диаграмма распределения прогнозов
+    # Круговая диаграмма распределения прогнозов с улучшенным дизайном
     pie = alt.Chart(df).mark_arc(innerRadius=50).encode(
         theta="count()",
         color=alt.Color(
@@ -68,10 +68,13 @@ def create_visualizations(df: pd.DataFrame, pred_col: str, prob_col: str) -> Lis
     ).properties(
         width=300,
         height=300,
-        title="Распределение прогнозов дефолта"
+        title={
+            "text": "Распределение прогнозов дефолта",
+            "fontSize": 16
+        }
     )
 
-    # Гистограмма вероятностей дефолта
+    # Улучшенная гистограмма вероятностей дефолта
     hist = alt.Chart(df).mark_bar().encode(
         x=alt.X(
             f"{prob_col}:Q",
@@ -80,12 +83,15 @@ def create_visualizations(df: pd.DataFrame, pred_col: str, prob_col: str) -> Lis
         ),
         y=alt.Y(
             "count()",
-            title="Количество заявок"
+            title="Количество заявок",
+            stack=None
         ),
         color=alt.Color(
             f"{pred_col}:N",
-            scale=alt.Scale(domain=[0, 1], range=["#4caf50", "#e91e63"])
+            scale=alt.Scale(domain=[0, 1], range=["#4caf50", "#e91e63"]),
+            legend=alt.Legend(title="Статус дефолта")
         ),
+        opacity=alt.value(0.7),
         tooltip=[
             alt.Tooltip(f"{prob_col}:Q", title="Вероятность", format=".2f"),
             alt.Tooltip("count()", title="Количество")
@@ -93,17 +99,28 @@ def create_visualizations(df: pd.DataFrame, pred_col: str, prob_col: str) -> Lis
     ).properties(
         width=600,
         height=300,
-        title="Распределение вероятностей дефолта"
+        title={
+            "text": "Распределение вероятностей дефолта",
+            "fontSize": 16
+        }
     )
 
-    # Точечная диаграмма: доход vs сумма кредита
-    scatter = alt.Chart(df).mark_circle(size=60).encode(
-        x=alt.X("person_income:Q", title="Годовой доход"),
-        y=alt.Y("loan_amnt:Q", title="Сумма кредита"),
+    # Улучшенная точечная диаграмма с трендом
+    scatter = alt.Chart(df).mark_circle(size=60, opacity=0.6).encode(
+        x=alt.X("person_income:Q", 
+                title="Годовой доход",
+                scale=alt.Scale(zero=False)),
+        y=alt.Y("loan_amnt:Q", 
+                title="Сумма кредита",
+                scale=alt.Scale(zero=False)),
         color=alt.Color(
-            f"{pred_col}:N",
-            scale=alt.Scale(domain=[0, 1], range=["#4caf50", "#e91e63"])
+            f"{prob_col}:Q",
+            scale=alt.Scale(scheme="redyellowgreen", reverse=True),
+            title="Вероятность дефолта"
         ),
+        size=alt.Size(f"{prob_col}:Q", 
+                     scale=alt.Scale(range=[60, 400]),
+                     title="Вероятность дефолта"),
         tooltip=[
             alt.Tooltip("person_income:Q", title="Доход", format=",.0f"),
             alt.Tooltip("loan_amnt:Q", title="Сумма кредита", format=",.0f"),
@@ -114,45 +131,66 @@ def create_visualizations(df: pd.DataFrame, pred_col: str, prob_col: str) -> Lis
     ).properties(
         width=600,
         height=400,
-        title="Соотношение дохода и суммы кредита"
+        title={
+            "text": "Соотношение дохода и суммы кредита",
+            "fontSize": 16
+        }
     )
 
-    # Тепловая карта риска по целям кредита и рейтингу
-    heatmap = alt.Chart(df).mark_rect().encode(
-        x=alt.X("loan_grade:N", title="Кредитный рейтинг"),
-        y=alt.Y("loan_intent:N", title="Цель кредита"),
+    # Новый график: Средняя вероятность дефолта по возрастным группам и кредитному рейтингу
+    df['age_group'] = pd.cut(df['person_age'], 
+                            bins=[0, 25, 35, 45, 55, 100], 
+                            labels=['18-25', '26-35', '36-45', '46-55', '55+'])
+    
+    age_grade_risk = alt.Chart(df).mark_rect().encode(
+        x=alt.X('age_group:N', title='Возрастная группа'),
+        y=alt.Y('loan_grade:N', title='Кредитный рейтинг', sort=['A', 'B', 'C', 'D', 'E', 'F', 'G']),
         color=alt.Color(
-            f"mean({prob_col}):Q",
-            title="Средняя вероятность",
-            scale=alt.Scale(scheme="redyellowgreen", reverse=True)
+            f'mean({prob_col}):Q',
+            title='Средняя вероятность дефолта',
+            scale=alt.Scale(scheme='redyellowgreen', reverse=True)
         ),
         tooltip=[
-            alt.Tooltip("loan_grade:N", title="Рейтинг"),
-            alt.Tooltip("loan_intent:N", title="Цель"),
-            alt.Tooltip(f"mean({prob_col}):Q", title="Ср. вероятность", format=".2%"),
-            alt.Tooltip("count()", title="Количество заявок")
+            alt.Tooltip('age_group:N', title='Возраст'),
+            alt.Tooltip('loan_grade:N', title='Рейтинг'),
+            alt.Tooltip(f'mean({prob_col}):Q', title='Ср. вероятность', format='.2%'),
+            alt.Tooltip('count()', title='Количество заявок')
         ]
     ).properties(
         width=500,
         height=300,
-        title="Тепловая карта риска дефолта"
+        title={
+            "text": "Риск дефолта по возрасту и рейтингу",
+            "fontSize": 16
+        }
     )
 
-    # Боксплот возраста по прогнозу дефолта
-    boxplot = alt.Chart(df).mark_boxplot().encode(
-        x=alt.X(f"{pred_col}:N", title="Прогноз дефолта"),
-        y=alt.Y("person_age:Q", title="Возраст заявителя"),
+    # Новый график: Распределение целей кредита и их рискованность
+    intent_analysis = alt.Chart(df).mark_bar().encode(
+        x=alt.X('loan_intent:N', 
+                title='Цель кредита',
+                sort=alt.EncodingSortField(field=f'{prob_col}', op='mean', order='descending')),
+        y=alt.Y('count()', title='Количество заявок'),
         color=alt.Color(
-            f"{pred_col}:N",
-            scale=alt.Scale(domain=[0, 1], range=["#4caf50", "#e91e63"])
-        )
+            f'mean({prob_col}):Q',
+            title='Средняя вероятность дефолта',
+            scale=alt.Scale(scheme='redyellowgreen', reverse=True)
+        ),
+        tooltip=[
+            alt.Tooltip('loan_intent:N', title='Цель кредита'),
+            alt.Tooltip('count()', title='Количество заявок'),
+            alt.Tooltip(f'mean({prob_col}):Q', title='Ср. вероятность дефолта', format='.2%')
+        ]
     ).properties(
-        width=300,
+        width=500,
         height=300,
-        title="Распределение возраста по прогнозу"
+        title={
+            "text": "Анализ целей кредита и их рискованности",
+            "fontSize": 16
+        }
     )
 
-    return [pie, hist, scatter, heatmap, boxplot]
+    return [pie, hist, scatter, age_grade_risk, intent_analysis]
 
 
 def read_user_data(uploaded_file: Any) -> pd.DataFrame:
